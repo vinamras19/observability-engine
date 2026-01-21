@@ -112,3 +112,6 @@ WINDOW_SECONDS: Aggregation window size (Default: 60s)
 
 ALERT_THRESHOLD: CPU % that triggers a warning (Default: 85.0)
 ```
+
+## License
+See `LICENSE` for more information.
