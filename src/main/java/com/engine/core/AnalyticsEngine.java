@@ -119,7 +119,7 @@ public class AnalyticsEngine {
                             "{\"type\":\"THRESHOLD_BREACH\",\"host\":\"%s\",\"metric\":\"%s\",\"avg\":%.2f,\"threshold\":%.2f,\"severity\":\"%s\"}",
                             window.key(), agg.getMetricName(), agg.getAverage(), ALERT_THRESHOLD, agg.getSeverity()
                     );
-                    log.warn("ALARM: Host {} breached threshold. Avg CPU: %.2f%%", window.key(), agg.getAverage());
+                    log.warn("ALARM: Host {} breached threshold. Avg CPU: {}%", window.key(), String.format("%.2f", agg.getAverage()));
                     return new KeyValue<>(window.key(), alert);
                 })
                 .to(ALERTS_TOPIC);
