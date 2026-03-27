@@ -15,7 +15,7 @@ public class MetricAggregation {
     private double min = Double.MAX_VALUE;
 
     @JsonProperty("max")
-    private double max = Double.MIN_VALUE;
+    private double max = Double.NEGATIVE_INFINITY;
 
     @JsonProperty("host")
     private String host;

@@ -101,13 +101,20 @@ public class AnalyticsEngine {
         //Analysis Results
         aggregated.toStream()
                 .map((window, agg) -> {
-                    String output = String.format(
-                            "{\"host\":\"%s\",\"metric\":\"%s\",\"avg\":%.2f,\"min\":%.2f,\"max\":%.2f,\"count\":%d,\"status\":\"%s\"}",
-                            window.key(), agg.getMetricName(), agg.getAverage(),
-                            agg.getMin(), agg.getMax(), agg.getCount(),
-                            agg.isBreaching(ALERT_THRESHOLD) ? "BREACH" : "NORMAL"
-                    );
-                    return new KeyValue<>(window.key(), output);
+                    try {
+                        java.util.Map<String, Object> output = new java.util.LinkedHashMap<>();
+                        output.put("host", window.key());
+                        output.put("metric", agg.getMetricName());
+                        output.put("avg", agg.getAverage());
+                        output.put("min", agg.getMin());
+                        output.put("max", agg.getMax());
+                        output.put("count", agg.getCount());
+                        output.put("status", agg.isBreaching(ALERT_THRESHOLD) ? "BREACH" : "NORMAL");
+                        return new KeyValue<>(window.key(), mapper.writeValueAsString(output));
+                    } catch (Exception e) {
+                        log.error("Failed to serialize aggregation for {}", window.key(), e);
+                        return new KeyValue<>(window.key(), "{}");
+                    }
                 })
                 .to(OUTPUT_TOPIC);
 
@@ -115,12 +122,20 @@ public class AnalyticsEngine {
         aggregated.toStream()
                 .filter((window, agg) -> agg != null && agg.isBreaching(ALERT_THRESHOLD))
                 .map((window, agg) -> {
-                    String alert = String.format(
-                            "{\"type\":\"THRESHOLD_BREACH\",\"host\":\"%s\",\"metric\":\"%s\",\"avg\":%.2f,\"threshold\":%.2f,\"severity\":\"%s\"}",
-                            window.key(), agg.getMetricName(), agg.getAverage(), ALERT_THRESHOLD, agg.getSeverity()
-                    );
-                    log.warn("ALARM: Host {} breached threshold. Avg CPU: {}%", window.key(), String.format("%.2f", agg.getAverage()));
-                    return new KeyValue<>(window.key(), alert);
+                    try {
+                        java.util.Map<String, Object> alert = new java.util.LinkedHashMap<>();
+                        alert.put("type", "THRESHOLD_BREACH");
+                        alert.put("host", window.key());
+                        alert.put("metric", agg.getMetricName());
+                        alert.put("avg", agg.getAverage());
+                        alert.put("threshold", ALERT_THRESHOLD);
+                        alert.put("severity", agg.getSeverity());
+                        log.warn("ALARM: Host {} breached threshold. Avg CPU: {}%", window.key(), String.format("%.2f", agg.getAverage()));
+                        return new KeyValue<>(window.key(), mapper.writeValueAsString(alert));
+                    } catch (Exception e) {
+                        log.error("Failed to serialize alert for {}", window.key(), e);
+                        return new KeyValue<>(window.key(), "{}");
+                    }
                 })
                 .to(ALERTS_TOPIC);
 
