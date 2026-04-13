@@ -110,6 +110,7 @@ public class AnalyticsEngine {
                         output.put("max", agg.getMax());
                         output.put("count", agg.getCount());
                         output.put("status", agg.isBreaching(ALERT_THRESHOLD) ? "BREACH" : "NORMAL");
+                        output.put("window_end", window.window().end());
                         return new KeyValue<>(window.key(), mapper.writeValueAsString(output));
                     } catch (Exception e) {
                         log.error("Failed to serialize aggregation for {}", window.key(), e);

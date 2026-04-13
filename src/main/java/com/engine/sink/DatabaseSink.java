@@ -129,7 +129,7 @@ public class DatabaseSink {
         try {
             JsonNode json = mapper.readTree(jsonString);
             return Point.measurement("server_metrics")
-                    .time(Instant.now(), WritePrecision.MS)
+                    .time(Instant.ofEpochMilli(json.path("window_end").asLong(System.currentTimeMillis())), WritePrecision.MS)
                     .addTag("host", json.path("host").asText())
                     .addTag("status", json.path("status").asText())
                     .addField("avg", json.path("avg").asDouble())
