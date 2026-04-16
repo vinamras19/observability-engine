@@ -2,6 +2,7 @@ package com.engine.core;
 
 import com.engine.model.Metric;
 import com.engine.model.MetricAggregation;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -27,8 +28,12 @@ public class AnalyticsEngine {
     private static final String INPUT_TOPIC = getEnv("KAFKA_INPUT_TOPIC", "raw-metrics");
     private static final String OUTPUT_TOPIC = getEnv("KAFKA_OUTPUT_TOPIC", "analyzed-metrics");
     private static final String ALERTS_TOPIC = getEnv("KAFKA_ALERTS_TOPIC", "metric-alerts");
+    private static final String SIGNAL_TOPIC = getEnv("KAFKA_SIGNAL_TOPIC", "signal-alerts");
     private static final double ALERT_THRESHOLD = Double.parseDouble(getEnv("ALERT_THRESHOLD", "85.0"));
     private static final int WINDOW_SECONDS = Integer.parseInt(getEnv("WINDOW_SECONDS", "60"));
+
+    // Signal analysis — stateful per-host processors
+    private static final SignalAnalyzer signalAnalyzer = new SignalAnalyzer();
 
     public static void main(String[] args) {
         log.info("Starting Analytics Engine...");
@@ -99,7 +104,7 @@ public class AnalyticsEngine {
                 );
 
         //Analysis Results
-        aggregated.toStream()
+        KStream<String, String> analysisStream = aggregated.toStream()
                 .map((window, agg) -> {
                     try {
                         java.util.Map<String, Object> output = new java.util.LinkedHashMap<>();
@@ -109,15 +114,46 @@ public class AnalyticsEngine {
                         output.put("min", agg.getMin());
                         output.put("max", agg.getMax());
                         output.put("count", agg.getCount());
-                        output.put("status", agg.isBreaching(ALERT_THRESHOLD) ? "BREACH" : "NORMAL");
                         output.put("window_end", window.window().end());
+                        output.put("status", agg.isBreaching(ALERT_THRESHOLD) ? "BREACH" : "NORMAL");
                         return new KeyValue<>(window.key(), mapper.writeValueAsString(output));
                     } catch (Exception e) {
                         log.error("Failed to serialize aggregation for {}", window.key(), e);
                         return new KeyValue<>(window.key(), "{}");
                     }
+                });
+
+        analysisStream.to(OUTPUT_TOPIC);
+
+        //Signal Analysis — EWMA smoothing, CUSUM change-point detection, streaming entropy
+        analysisStream
+                .mapValues(json -> {
+                    try {
+                        JsonNode node = mapper.readTree(json);
+                        String host = node.path("host").asText();
+                        double avg = node.path("avg").asDouble();
+
+                        SignalResult result = signalAnalyzer.analyze(host, avg);
+
+                        java.util.Map<String, Object> output = new java.util.LinkedHashMap<>();
+                        output.put("host", host);
+                        output.put("raw_avg", result.getRawValue());
+                        output.put("ewma", result.getEwma());
+                        output.put("cusum_high", result.getCusumHigh());
+                        output.put("cusum_low", result.getCusumLow());
+                        output.put("cusum_alert", result.isCusumAlert());
+                        output.put("shift_direction", result.getShiftDirection());
+                        output.put("entropy", result.getEntropy());
+                        output.put("normalized_entropy", result.getNormalizedEntropy());
+                        output.put("sigma", result.getSigma());
+                        output.put("running_mean", result.getRunningMean());
+                        return mapper.writeValueAsString(output);
+                    } catch (Exception e) {
+                        log.error("Signal analysis failed: {}", e.getMessage());
+                        return "{}";
+                    }
                 })
-                .to(OUTPUT_TOPIC);
+                .to(SIGNAL_TOPIC);
 
         //Alerting Logic
         aggregated.toStream()
