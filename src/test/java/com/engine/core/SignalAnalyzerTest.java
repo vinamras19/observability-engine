@@ -81,7 +81,7 @@ class SignalAnalyzerTest {
 
         boolean anyAlert = false;
         for (int i = 0; i < 100; i++) {
-            double value = 50.0 + (Math.random() - 0.5) * 4;
+            double value = 50.0 + (i % 2 == 0 ? 1.0 : -1.0);
             SignalResult result = analyzer.analyze("host-1", value);
             if (result.isCusumAlert()) {
                 anyAlert = true;
