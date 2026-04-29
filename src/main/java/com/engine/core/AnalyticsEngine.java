@@ -29,11 +29,13 @@ public class AnalyticsEngine {
     private static final String OUTPUT_TOPIC = getEnv("KAFKA_OUTPUT_TOPIC", "analyzed-metrics");
     private static final String ALERTS_TOPIC = getEnv("KAFKA_ALERTS_TOPIC", "metric-alerts");
     private static final String SIGNAL_TOPIC = getEnv("KAFKA_SIGNAL_TOPIC", "signal-alerts");
+    private static final String ADVANCED_SIGNAL_TOPIC = getEnv("KAFKA_ADVANCED_SIGNAL_TOPIC", "advanced-signals");
     private static final double ALERT_THRESHOLD = Double.parseDouble(getEnv("ALERT_THRESHOLD", "85.0"));
     private static final int WINDOW_SECONDS = Integer.parseInt(getEnv("WINDOW_SECONDS", "60"));
 
     // Signal analysis — stateful per-host processors
     private static final SignalAnalyzer signalAnalyzer = new SignalAnalyzer();
+    private static final AdvancedSignalAnalyzer advancedSignalAnalyzer = new AdvancedSignalAnalyzer();
 
     public static void main(String[] args) {
         log.info("Starting Analytics Engine...");
@@ -154,6 +156,34 @@ public class AnalyticsEngine {
                     }
                 })
                 .to(SIGNAL_TOPIC);
+
+        //Advanced Signal Analysis — Kalman filtering, Bayesian change-point detection
+        analysisStream
+                .mapValues(json -> {
+                    try {
+                        JsonNode node = mapper.readTree(json);
+                        String host = node.path("host").asText();
+                        double avg = node.path("avg").asDouble();
+
+                        AdvancedSignalResult result = advancedSignalAnalyzer.analyze(host, avg);
+
+                        java.util.Map<String, Object> output = new java.util.LinkedHashMap<>();
+                        output.put("host", host);
+                        output.put("raw_avg", result.getRawValue());
+                        output.put("kalman_predicted", result.getKalmanPredicted());
+                        output.put("kalman_residual", result.getKalmanResidual());
+                        output.put("residual_variance", result.getResidualVariance());
+                        output.put("kalman_estimate", result.getKalmanEstimate());
+                        output.put("kalman_anomaly", result.isKalmanAnomaly());
+                        output.put("change_point_prob", result.getChangePointProb());
+                        output.put("bayesian_alert", result.isBayesianAlert());
+                        return mapper.writeValueAsString(output);
+                    } catch (Exception e) {
+                        log.error("Advanced signal analysis failed: {}", e.getMessage());
+                        return "{}";
+                    }
+                })
+                .to(ADVANCED_SIGNAL_TOPIC);
 
         //Alerting Logic
         aggregated.toStream()
