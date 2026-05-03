@@ -13,7 +13,7 @@ A distributed telemetry pipeline designed to ingest, aggregate, and analyze serv
 
 ## Engineering Highlights
 
-* **Signal Analysis:** Applies three statistical techniques to the aggregated metric stream - EWMA smoothing for noise filtering, CUSUM change point detection for identifying sustained mean shifts, and streaming Shannon entropy estimation over a sliding window for detecting regime changes.
+* **Signal Analysis:** Applies five statistical techniques to the aggregated metric stream - EWMA smoothing for noise filtering, CUSUM change-point detection for identifying sustained mean shifts, streaming Shannon entropy estimation over a sliding window for detecting regime changes, Kalman filtering for anomaly detection via normalized residuals, and Bayesian online change-point detection for probabilistic regime shift identification.
 * **Fault Tolerance:** Implemented a Poison Pill pattern in the stream topology. Malformed JSON records are logged and discarded at the ingress point to prevent stream thread crashes.
 * **Write Optimization:** The Database Sink implements a manual batching mechanism (flushes every 500 records or 5 seconds) to reduce network overhead to InfluxDB.
 * **Windowed Analytics:** Uses 60-second tumbling time windows to calculate min, max, and avg CPU usage in real-time.
@@ -26,29 +26,26 @@ The system follows a standard **Producer → Processor → Sink** pattern, decou
 
 ```mermaid
 graph LR
-    %% Components
     Prod[Metric Producer] -->|JSON| T1[raw-metrics]
     T1 --> Engine[Analytics Engine]
     
     subgraph "Kafka Streams"
         Engine -->|Windowed Aggregation| Engine
         Engine -->|EWMA / CUSUM / Entropy| Signal[Signal Analyzer]
+        Engine -->|Kalman / Bayesian CPD| Advanced[Advanced Analyzer]
     end
     
     Engine -->|Aggregated Data| T2[analyzed-metrics]
     Signal -->|Anomaly Data| T3[signal-alerts]
+    Advanced -->|Advanced Anomaly Data| T4[advanced-signals]
     T2 --> Sink[Database Sink]
     T3 --> SSink[Signal Sink]
+    T4 --> ASink[Advanced Signal Sink]
     
     Sink -->|Batch Write| DB[(InfluxDB)]
     SSink -->|Batch Write| DB
+    ASink -->|Batch Write| DB
     DB -->|Query| Dash[Grafana]
-
-    %% Styling
-    classDef plain fill:#fff,stroke:#333,stroke-width:1px;
-    classDef db fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    class Prod,Engine,Signal,Sink,SSink,T1,T2,T3,Dash plain;
-    class DB db;
 ```
 
 ## Getting Started
@@ -75,6 +72,7 @@ docker exec observability-engine-kafka-1 kafka-topics --create --bootstrap-serve
 docker exec observability-engine-kafka-1 kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic analyzed-metrics
 docker exec observability-engine-kafka-1 kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic metric-alerts
 docker exec observability-engine-kafka-1 kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic signal-alerts
+docker exec observability-engine-kafka-1 kafka-topics --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic advanced-signals
 ```
 ### Running the Pipeline
 
@@ -92,20 +90,25 @@ Terminal 3: Signal Sink (Signal Analysis Consumer)
 ```text
 java -cp target/observability-engine-1.0.0.jar com.engine.sink.SignalSink
 ```
-Terminal 4: Metric Producer (The Generator)
+Terminal 4: Advanced Signal Sink (Kalman/Bayesian Consumer)
+```text
+java -cp target/observability-engine-1.0.0.jar com.engine.sink.AdvancedSignalSink
+```
+Terminal 5: Metric Producer (The Generator)
 ```text
 java -cp target/observability-engine-1.0.0.jar com.engine.producer.MetricProducer
 ```
+
 ## Observability
 
 ```text
 Grafana Dashboard: http://localhost:3000 (User: admin / Pass: admin)
 
-Visualizes real-time CPU trends, breach counts, and system status.
+Visualizes real-time CPU trends, breach counts, system status, and signal analysis output (EWMA, CUSUM, entropy, Kalman estimate, change-point probability).
 
 InfluxDB UI: http://localhost:8086
 
-Tests: Run mvn test to verify aggregation and signal analysis logic.
+Tests: Run mvn test to verify aggregation, signal analysis, and advanced signal analysis logic.
 ```
 
 ## Dashboard
@@ -113,6 +116,8 @@ Tests: Run mvn test to verify aggregation and signal analysis logic.
 ![Dashboard](dashboard-demo.png)
 
 ![Signal Analysis](signal-analysis-demo.png)
+
+![Advanced Signal Analysis](advanced-signal-analysis-demo.png)
 
 ## Configuration
 
@@ -131,6 +136,17 @@ Signal Analyzer Defaults (configurable in SignalAnalyzer constructor):
   CUSUM h:              4.0   (decision threshold)
   Entropy window size:  30    (sliding window of recent values)
   Entropy bins:         20    (histogram resolution across 0-100%)
+```
+
+```text
+Advanced Signal Analyzer Defaults (configurable in AdvancedSignalAnalyzer constructor):
+
+  Kalman process noise:      1.0   (state transition uncertainty)
+  Kalman measurement noise:  5.0   (observation uncertainty)
+  Kalman threshold:          3.0   (normalized residual threshold for anomaly)
+  Bayesian hazard rate:      50.0  (expected run length between change points)
+  Bayesian threshold:        0.5   (change-point probability threshold)
+  Max run length:            200   (truncation for run length distribution)
 ```
 
 ## License
