@@ -148,6 +148,15 @@ Advanced Signal Analyzer Defaults (configurable in AdvancedSignalAnalyzer constr
   Bayesian threshold:        0.5   (change-point probability threshold)
   Max run length:            200   (truncation for run length distribution)
 ```
+## Benchmark
+
+```text
+Comparative evaluation of CUSUM and Kalman detectors across noise levels and shift sizes.
+
+Run:    mvn compile exec:java -Dexec.mainClass=com.engine.benchmark.BenchmarkRunner
+Report: docs/benchmark-report.md
+Data:   docs/benchmark-results.csv
+```
 
 ## License
 See `LICENSE` for more information.
