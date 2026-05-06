@@ -1,23 +1,16 @@
 # Distributed Observability Engine
 
-A distributed telemetry pipeline designed to ingest, aggregate, and analyze server metrics in real-time. This project implements a Kafka Streams topology for stateful windowed aggregation, a signal processing layer for statistical anomaly detection, and a custom InfluxDB sink for persistent time-series storage.
+**Tech Stack:** Java 17, Apache Kafka Streams, InfluxDB, Grafana, Docker
 
-## Technology Stack
-
-* **Core Application:** Java 17, Maven
-* **Stream Processing:** Apache Kafka (Kafka Streams API)
-* **Time-Series Database:** InfluxDB v2
-* **Visualization:** Grafana
-* **Infrastructure:** Docker, Docker Compose, Zookeeper
-* **Testing:** JUnit 5
+A real-time telemetry pipeline that ingests server metrics over Kafka Streams, computes windowed aggregations, runs signal analysis for anomaly detection, and writes results to InfluxDB.
 
 ## Engineering Highlights
 
-* **Signal Analysis:** Applies five statistical techniques to the aggregated metric stream - EWMA smoothing for noise filtering, CUSUM change-point detection for identifying sustained mean shifts, streaming Shannon entropy estimation over a sliding window for detecting regime changes, Kalman filtering for anomaly detection via normalized residuals, and Bayesian online change-point detection for probabilistic regime shift identification.
+* **Signal Analysis:** Applies EWMA smoothing, CUSUM change-point detection, streaming Shannon entropy, Kalman filtering, and Bayesian online change-point detection to the aggregated metric stream for anomaly detection.
 * **Fault Tolerance:** Implemented a Poison Pill pattern in the stream topology. Malformed JSON records are logged and discarded at the ingress point to prevent stream thread crashes.
 * **Write Optimization:** The Database Sink implements a manual batching mechanism (flushes every 500 records or 5 seconds) to reduce network overhead to InfluxDB.
 * **Windowed Analytics:** Uses 60-second tumbling time windows to calculate min, max, and avg CPU usage in real-time.
-* **DevEx & Networking:** Configured a dual-listener Kafka setup (PLAINTEXT for internal Docker traffic, PLAINTEXT_HOST for localhost) to allow local Java processes to communicate with containerized infrastructure.
+* **Networking:** Configured a dual-listener Kafka setup (PLAINTEXT for internal Docker traffic, PLAINTEXT_HOST for localhost) to allow local Java processes to communicate with containerized infrastructure.
 * **Data Simulation:** The metric producer uses a stateful Random Walk algorithm to generate drifting CPU trends for threshold testing.
 
 ## System Architecture
