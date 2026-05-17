@@ -10,7 +10,7 @@ A real-time telemetry pipeline that ingests server metrics over Kafka Streams, c
 * **Fault Tolerance:** Implemented a Poison Pill pattern in the stream topology. Malformed JSON records are logged and discarded at the ingress point to prevent stream thread crashes.
 * **Write Optimization:** The Database Sink implements a manual batching mechanism (flushes every 500 records or 5 seconds) to reduce network overhead to InfluxDB.
 * **Windowed Analytics:** Uses 60-second tumbling time windows to calculate min, max, and avg CPU usage in real-time.
-* **Networking:** Configured a dual-listener Kafka setup (PLAINTEXT for internal Docker traffic, PLAINTEXT_HOST for localhost) to allow local Java processes to communicate with containerized infrastructure.
+* **Networking:** Configured a dual-listener Kafka setup (PLAINTEXT for localhost, PLAINTEXT_INTERNAL for internal Docker traffic) to allow local Java processes to communicate with containerized infrastructure.
 * **Data Simulation:** The metric producer uses a stateful Random Walk algorithm to generate drifting CPU trends for threshold testing.
 
 ## System Architecture
@@ -146,7 +146,7 @@ Advanced Signal Analyzer Defaults (configurable in AdvancedSignalAnalyzer constr
 ```text
 Comparative evaluation of CUSUM and Kalman detectors across noise levels and shift sizes.
 
-Run:    mvn compile exec:java -Dexec.mainClass=com.engine.benchmark.BenchmarkRunner
+Run:    java -cp target/observability-engine-1.0.0.jar com.engine.benchmark.BenchmarkRunner
 Report: docs/benchmark-report.md
 Data:   docs/benchmark-results.csv
 ```

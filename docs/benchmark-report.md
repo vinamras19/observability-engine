@@ -35,8 +35,8 @@ Bayesian Online CPD was implemented but excluded - see bottom.
 
 ## Reproducing
 
-```bash
-mvn compile exec:java -Dexec.mainClass=com.engine.benchmark.BenchmarkRunner
+```text
+java -cp target/observability-engine-1.0.0.jar com.engine.benchmark.BenchmarkRunner
 ```
 
 Raw data: `docs/benchmark-results.csv`
